@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<title>WebSocket Test</title>
+<h2>WebSocket Test</h2>
+
+<form id="myform">
+<input type="text" id="textbox" />
+<button type="submit">Send</button>
+</form>
+<button type="button" onclick="closeConnection()">Close connection</button>
+
+<div id="output"></div>
+
+<script language="javascript" type="text/javascript">
+  var wsUri = "ws://127.0.0.1:8000/";
+  var output;
+
+  function init()
+  {
+    output = document.getElementById("output");
+    testWebSocket();
+  }
+
+  function testWebSocket()
+  {
+    websocket = new WebSocket(wsUri);
+    websocket.onopen = function(evt) { onOpen(evt) };
+    websocket.onclose = function(evt) { onClose(evt) };
+    websocket.onmessage = function(evt) { onMessage(evt) };
+    websocket.onerror = function(evt) { onError(evt) };
+  }
+
+  function onOpen(evt)
+  {
+    writeToScreen("CONNECTED");
+  }
+
+  function onClose(evt)
+  {
+    writeToScreen("DISCONNECTED");
+  }
+
+  function onMessage(evt)
+  {
+    writeToScreen('<span style="color: blue;">RESPONSE: ' + evt.data+'</span>');
+  }
+
+  function onError(evt)
+  {
+    writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
+  }
+
+  function doSend(message)
+  {
+    writeToScreen("SENT: " + message);
+    websocket.send(message);
+    document.getElementById('textbox').value = "";
+  }
+
+  function writeToScreen(message)
+  {
+    var pre = document.createElement("p");
+    pre.style.wordWrap = "break-word";
+    pre.innerHTML = message;
+    output.appendChild(pre);
+  }
+
+  function closeConnection()
+  {
+    websocket.close();
+  }
+
+  window.addEventListener("load", init, false);
+  document.getElementById('myform').addEventListener("submit", function(evt) {
+    evt.preventDefault();
+    doSend(document.getElementById('textbox').value);
+    return false;
+  });
+
+</script>

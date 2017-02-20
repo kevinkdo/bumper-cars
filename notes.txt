@@ -1,0 +1,11 @@
+cargo run
+cargo build --release --target=x86_64-unknown-linux-musl
+docker build -t kkdo_app .
+docker run -t -p 8000 [image_id]
+docker stop [container_id]
+docker rm [container_id]
+docker rmi [image_id]
+
+docker login
+docker tag [image_id] kevinkdo/messengerbot
+docker push kevinkdo/messengerbot
