@@ -1,0 +1,19 @@
+# Primitive bash build system
+
+echo "Building JSX"
+babel --plugins transform-react-jsx car.jsx > bundle.js
+
+echo "Post-processing car.html"
+# Remove unnecessary imports
+grep -vwE "browser.min.js|car.jsx" car.html > temp
+# Uncomment bundle.js
+sed -i .temp -e 's#<!--<script src="bundle.js"></script>-->#<script src="bundle.js"></script>#g' temp
+# Switch to minified libraries
+sed -i .temp 's/react.js/react.min.js/g' temp
+sed -i .temp 's/react-dom.js/react-dom.min.js/g' temp
+
+cat temp > car_prod.html
+rm temp
+rm *.temp
+
+echo "Done building targets: car_prod.html, bundle.js"

@@ -1,12 +1,18 @@
 extern crate websocket;
 
+use std::str;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::sync::mpsc;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use websocket::{Server, Message, Sender, Receiver};
 use websocket::message::Type;
+use websocket::ws::dataframe::DataFrame;
+
+static GLOBAL_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
 
 fn main() {
+    GLOBAL_COUNTER.fetch_add(1, Ordering::SeqCst);
     let server = Server::bind("0.0.0.0:8000").unwrap();
 
     let txs = Arc::new(Mutex::new(Vec::new()));
@@ -22,7 +28,7 @@ fn main() {
             .unwrap();
         println!("Connection from {}", ip);
 
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel::<Message>();
         let tx = Arc::new(Mutex::new(tx));
 
         let tx_to_push = tx.clone();
@@ -34,6 +40,9 @@ fn main() {
         // `sender` thread
         thread::spawn(move || {
             for message in rx {
+                let payload = message.payload();
+                let payload = str::from_utf8(payload.as_ref());
+                println!("> {:?}", payload);
                 sender.send_message(&message).unwrap();
             }
         });
@@ -57,11 +66,31 @@ fn main() {
                         tx.send(message).unwrap();
                     }
                     _ => {
-                        let txs = txs_for_thread.lock().unwrap();
-                        for tx in txs.iter() {
-                            let tx = tx.lock().unwrap();
-                            tx.send(message.clone()).unwrap();
-                        }
+                        let raw_payload = message.payload();
+                        let raw_payload = str::from_utf8(raw_payload.as_ref());
+                        println!("< {:?}", raw_payload);
+
+                        match raw_payload {
+                            // Reply with unique id only to the sender
+                            Ok("getid") => {
+                                let id_string = GLOBAL_COUNTER.fetch_add(1, Ordering::SeqCst).to_string();
+                                let prefix = "getid".to_string();
+                                let combined_string = prefix + &id_string;
+                                let message = Message::text(combined_string);
+                                let tx = tx.lock().unwrap();
+                                tx.send(message).unwrap()
+                            },
+                            // Broadcast the message if it's a valid UTF8 encoding
+                            Ok(_) => {
+                                let txs = txs_for_thread.lock().unwrap();
+                                for tx in txs.iter() {
+                                    let tx = tx.lock().unwrap();
+                                    tx.send(message.clone()).unwrap();
+                                }
+                            }
+                            // Ignore the message if it's not valid UTF8
+                            Err(_) => {}
+                        };
                     }
                 }
             }

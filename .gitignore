@@ -3,3 +3,5 @@
 Cargo.lock
 npm-debug.log
 target/
+src/bundle.js
+src/car_prod.html
