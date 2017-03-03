@@ -13,6 +13,14 @@ const Playground = React.createClass({
     me.websocket.onerror = function(evt) { me.onWsError(evt) };
   },
 
+  sendUpdate: function(id, cars) {
+    var update_message = {
+      id: id,
+      position: cars[id]
+    };
+    this.websocket.send(JSON.stringify(update_message));
+  },
+
   setupKeyBindings: function() {
     var me = this;
     $(document).keydown(function(e) {
@@ -36,11 +44,7 @@ const Playground = React.createClass({
         default: return; // exit this handler for other keys
       }
 
-      var update_message = {
-        id: me.state.id,
-        position: me.state.cars[me.state.id]
-      };
-      me.websocket.send(JSON.stringify(update_message));
+      me.sendUpdate(me.state.id, me.state.cars);
       e.preventDefault(); // prevent the default action (scroll / move caret)
     });
   },
@@ -64,6 +68,7 @@ const Playground = React.createClass({
         id: id,
         cars: cars
       });
+      this.sendUpdate(id, cars);
     } else if (evt.data.startsWith("deleteid")) {
       const id = evt.data.slice(8);
       var cars = this.state.cars;
