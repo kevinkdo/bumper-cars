@@ -63,6 +63,18 @@ fn main() {
 
                 match message.opcode {
                     Type::Close => {
+                        // Tell everybody this player has left
+                        let txs = txs_copy2.lock().unwrap();
+                        for (_, tx) in txs.iter() {
+                            let tx = tx.lock().unwrap();
+                            let id_string = id.to_string();
+                            let prefix = "deleteid".to_string();
+                            let combined_string = prefix + &id_string;
+                            let message = Message::text(combined_string);
+                            tx.send(message.clone()).unwrap();
+                        }
+
+                        // Close the connection to this player
                         let message = Message::close();
                         let tx = tx.lock().unwrap();
                         tx.send(message).unwrap();

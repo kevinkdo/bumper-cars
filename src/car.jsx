@@ -64,6 +64,12 @@ const Playground = React.createClass({
         id: id,
         cars: cars
       });
+    } else if (evt.data.startsWith("deleteid")) {
+      const id = evt.data.slice(8);
+      var cars = this.state.cars;
+      this.setState({
+        cars: cars
+      });
     } else {
       var message = JSON.parse(evt.data);
       if (message.id === this.state.id) {
