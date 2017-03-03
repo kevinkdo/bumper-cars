@@ -1,5 +1,6 @@
 extern crate websocket;
 
+use std::collections::HashMap;
 use std::str;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -15,9 +16,10 @@ fn main() {
     GLOBAL_COUNTER.fetch_add(1, Ordering::SeqCst);
     let server = Server::bind("0.0.0.0:8000").unwrap();
 
-    let txs = Arc::new(Mutex::new(Vec::new()));
+    let txs_by_id = Arc::new(Mutex::new(HashMap::new()));
 
     for connection in server {
+        let id = GLOBAL_COUNTER.fetch_add(1, Ordering::SeqCst);
         let request = connection.unwrap().read_request().unwrap();
         let response = request.accept();
         let client = response.send().unwrap();
@@ -32,10 +34,11 @@ fn main() {
         let tx = Arc::new(Mutex::new(tx));
 
         let tx_to_push = tx.clone();
-        let txs_for_thread = txs.clone();
+        let txs_copy1 = txs_by_id.clone();
+        let txs_copy2 = txs_by_id.clone();
 
-        let mut txs = txs.lock().unwrap();
-        txs.push(tx_to_push);
+        let mut txs_by_id = txs_by_id.lock().unwrap();
+        txs_by_id.insert(id, tx_to_push);
 
         // `sender` thread
         thread::spawn(move || {
@@ -44,6 +47,12 @@ fn main() {
                 let payload = str::from_utf8(payload.as_ref());
                 println!("> {:?}", payload);
                 sender.send_message(&message).unwrap();
+
+                if message.opcode == Type::Close {
+                    let mut txs = txs_copy1.lock().unwrap();
+                    txs.remove(&id);
+                    return;
+                }
             }
         });
 
@@ -73,7 +82,7 @@ fn main() {
                         match raw_payload {
                             // Reply with unique id only to the sender
                             Ok("getid") => {
-                                let id_string = GLOBAL_COUNTER.fetch_add(1, Ordering::SeqCst).to_string();
+                                let id_string = id.to_string();
                                 let prefix = "getid".to_string();
                                 let combined_string = prefix + &id_string;
                                 let message = Message::text(combined_string);
@@ -82,8 +91,8 @@ fn main() {
                             },
                             // Broadcast the message if it's a valid UTF8 encoding
                             Ok(_) => {
-                                let txs = txs_for_thread.lock().unwrap();
-                                for tx in txs.iter() {
+                                let txs = txs_copy2.lock().unwrap();
+                                for (_, tx) in txs.iter() {
                                     let tx = tx.lock().unwrap();
                                     tx.send(message.clone()).unwrap();
                                 }
